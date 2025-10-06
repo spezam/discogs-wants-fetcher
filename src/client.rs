@@ -69,9 +69,6 @@ impl DiscogsClient {
             wants.append(&mut response.wants);
         }
 
-        // let response = response.text().await?;
-        // println!("{}", response);
-
         Ok(wants)
     }
 }
