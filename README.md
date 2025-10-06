@@ -1,0 +1,4 @@
+```sh
+cargo b --release
+
+```
