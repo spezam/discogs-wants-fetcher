@@ -22,7 +22,7 @@ pub struct Pagination {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Urls {
-    pub last: String,
+    pub last: Option<String>,
     pub next: Option<String>,
 }
 

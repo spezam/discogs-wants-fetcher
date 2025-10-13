@@ -12,8 +12,8 @@ const API_BASE_URL: &str = "https://api.discogs.com";
 impl DiscogsClient {
     pub fn new() -> Self {
         let client = reqwest::ClientBuilder::new()
-            .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(5))
+            .connect_timeout(Duration::from_secs(6))
+            .timeout(Duration::from_secs(6))
             .user_agent("WantsFetcher/1.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0")
             .build()
             .expect("Cannot initialize HTTP client");
@@ -41,7 +41,7 @@ impl DiscogsClient {
 
             // check status
             if !response.status().is_success() {
-                println!("Current status: {:?}", response.status());
+                println!("Current status: {:?}", response);
             }
             // check x-discogs-ratelimit-remaining
             let remaining_ratelimit = response
@@ -49,16 +49,18 @@ impl DiscogsClient {
                 .get("x-discogs-ratelimit-remaining")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("0")
-                .to_string();
+                .parse::<i32>()
+                .unwrap();
             println!("x-discogs-ratelimit-remaining {:?}", remaining_ratelimit);
 
-            if remaining_ratelimit == "1" {
-                println!("We will hit ratelimit, slowing down and continue in 15000 ms");
-                sleep(Duration::from_millis(15000)).await;
-            }
-
+            // unmmashal result
             let mut response_wants = response.error_for_status()?.json::<Wants>().await?;
             wants.append(&mut response_wants.wants);
+
+            if remaining_ratelimit <= 2 {
+                println!("We will hit ratelimit, slowing down and continue in 10000 ms");
+                sleep(Duration::from_millis(10000)).await;
+            }
 
             if let Some(next) = &response_wants.pagination.urls.next {
                 println!("next: {}", next);
