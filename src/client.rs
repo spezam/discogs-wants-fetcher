@@ -64,7 +64,7 @@ impl DiscogsClient {
 
             if let Some(next) = &response_wants.pagination.urls.next {
                 println!("next: {}", next);
-                url = format!("{}", next);
+                url = next.to_string();
             } else {
                 break;
             }
