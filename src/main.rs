@@ -19,8 +19,8 @@ async fn main() -> Result<(), reqwest::Error> {
     let client = DiscogsClient::new();
 
     match client.get_wants_raw(&args.username).await {
-        Ok(response) => {
-            println!("{:?}", response);
+        Ok(_response) => {
+            // println!("{:?}", response);
         }
         Err(err) => {
             println!("\t{}\n", err)

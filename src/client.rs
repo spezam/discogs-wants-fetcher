@@ -12,9 +12,9 @@ const API_BASE_URL: &str = "https://api.discogs.com";
 impl DiscogsClient {
     pub fn new() -> Self {
         let client = reqwest::ClientBuilder::new()
-            .connect_timeout(Duration::from_secs(2))
-            .timeout(Duration::from_secs(2))
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0")
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(5))
+            .user_agent("WantsFetcher/1.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0")
             .build()
             .expect("Cannot initialize HTTP client");
 
@@ -24,49 +24,48 @@ impl DiscogsClient {
     }
 
     pub async fn get_wants_raw(&self, username: &String) -> Result<Vec<Want>, reqwest::Error> {
-        let url = Url::parse_with_params(
+        let mut wants: Vec<Want> = Vec::new();
+        let mut url = Url::parse_with_params(
             format!("{}/users/{}/wants", API_BASE_URL, username).as_str(),
-            &[("per_page", "100")],
+            &[
+                ("per_page", "100"),
+                ("sort", "added"),
+                ("sort_order", "desc"),
+            ],
         )
-        .unwrap();
+        .unwrap()
+        .to_string();
 
-        let response: Wants = self
-            .reqwest_client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        loop {
+            let response = self.reqwest_client.get(url).send().await?;
 
-        let mut wants: Vec<Want> = response.wants;
+            // check status
+            if !response.status().is_success() {
+                println!("Current status: {:?}", response.status());
+            }
+            // check x-discogs-ratelimit-remaining
+            let remaining_ratelimit = response
+                .headers()
+                .get("x-discogs-ratelimit-remaining")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("0")
+                .to_string();
+            println!("x-discogs-ratelimit-remaining {:?}", remaining_ratelimit);
 
-        let pages = response.pagination.pages;
-        for page in 1..pages {
-            sleep(Duration::from_millis(1000)).await;
-
-            let url = Url::parse_with_params(
-                format!("{}/users/{}/wants", API_BASE_URL, username).as_str(),
-                &[
-                    ("page", &page.to_string()),
-                    ("per_page", &"100".to_string()),
-                ],
-            )
-            .unwrap();
-
-            let mut response = self.reqwest_client.get(url.clone()).send().await?;
-
-            while !response.status().is_success() {
-                if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-                    println!("Received 429, retrying in 5000 ms");
-                    sleep(Duration::from_millis(5000)).await;
-
-                    response = self.reqwest_client.get(url.clone()).send().await?;
-                }
+            if remaining_ratelimit == "1" {
+                println!("We will hit ratelimit, slowing down and continue in 15000 ms");
+                sleep(Duration::from_millis(15000)).await;
             }
 
-            let mut response: Wants = response.error_for_status()?.json().await?;
-            wants.append(&mut response.wants);
+            let mut response_wants = response.error_for_status()?.json::<Wants>().await?;
+            wants.append(&mut response_wants.wants);
+
+            if let Some(next) = &response_wants.pagination.urls.next {
+                println!("next: {}", next);
+                url = format!("{}", next);
+            } else {
+                break;
+            }
         }
 
         Ok(wants)
