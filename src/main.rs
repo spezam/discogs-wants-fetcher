@@ -5,7 +5,7 @@ use owo_colors::OwoColorize;
 const BANNER: &str = include_str!("../banner");
 
 #[derive(Parser, Debug)]
-#[command(version)]
+#[command(version, after_help = "eof")]
 struct CliArgs {
     #[clap(short, long, help = "Discogs username")]
     username: String,
